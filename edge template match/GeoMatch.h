@@ -13,24 +13,22 @@
 //***********************************************************************
 
 #pragma once
-#include <cv.h>
-#include <cxcore.h>
-#include <highgui.h>
 #include <math.h>
+#include <opencv2/opencv.hpp>
 
 class GeoMatch
 {
 private:
-	int				noOfCordinates;		//Number of elements in coordinate array
-	CvPoint			*cordinates;		//Coordinates array to store model points	
-	int				modelHeight;		//Template height
-	int				modelWidth;			//Template width
-	double			*edgeMagnitude;		//gradient magnitude
-	double			*edgeDerivativeX;	//gradient in X direction
-	double			*edgeDerivativeY;	//radient in Y direction	
-	CvPoint			centerOfGravity;	//Center of gravity of template 
+	int				m_noOfCordinates;		//Number of elements in coordinate array
+	cv::Point		*m_cordinates;		//Coordinates array to store model points	
+	int				m_modelHeight;		//Template height
+	int				m_modelWidth;			//Template width
+	double			*m_edgeMagnitude;		//gradient magnitude
+	double			*m_edgeDerivativeX;	//gradient in X direction
+	double			*m_edgeDerivativeY;	//radient in Y direction	
+	cv::Point		m_centerOfGravity;	//Center of gravity of template 
 	
-	bool			modelDefined;
+	bool			m_modelDefined;
 	
 	void CreateDoubleMatrix(double **&matrix,CvSize size);
 	void ReleaseDoubleMatrix(double **&matrix,int size);
@@ -39,8 +37,9 @@ public:
 	GeoMatch(const void* templateArr);
 	~GeoMatch(void);
 
-	int CreateGeoMatchModel(const void* templateArr,double,double);
-	double FindGeoMatchModel(const void* srcarr,double minScore,double greediness, CvPoint *resultPoint);
-	void DrawContours(IplImage* pImage,CvPoint COG,CvScalar,int);
-	void DrawContours(IplImage* pImage,CvScalar,int);
+	int CreateGeoMatchModel(cv::Mat& src, double, double);
+	void GeoMatch::DrawContours(cv::Mat& source, cv::Point COG, int color);
+	void DrawContours(cv::Mat& source, int color);
+	void FindGeoMatchModel(cv::Mat& src, cv::Mat& dst, double minScore, double greediness);
+
 };

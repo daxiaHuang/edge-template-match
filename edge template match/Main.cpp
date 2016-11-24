@@ -23,104 +23,91 @@
 using namespace std;
 int main(int argc, char** argv)
 {
-	void WrongUsage();
-
-	CommandParser cp(argc,argv); // object to parse command line
-	
-	GeoMatch GM;				// object to implent geometric matching	
-	int lowThreshold = 10;		//deafult value
-	int highThreashold = 100;	//deafult value
-
-	double minScore=0.7;		//deafult value
-	double greediness=0.8;		//deafult value
+	struct GeoMatch GM;			
+	int lowThreshold ,highThreashold;	
+	double minScore, greediness;		
 
 	double total_time =0;
-	double score= 0;
-	CvPoint result;
-
-	//Load Template image 
-	IplImage* templateImage = cvLoadImage("Template.jpg", -1 );
-	if( templateImage == NULL )
+	cv::Mat templateImage = cv::imread("2.png", 0);
+	cv::Mat searchImage = cv::imread("1.png", 0);
+	if (templateImage.data == NULL || searchImage.data == NULL)
 	{
 		return 0;
 	}
-	
-	//Load Search Image
-	IplImage* searchImage = cvLoadImage("Search2.jpg", -1 );
-	if( searchImage == NULL )
-	{
-		return 0;
-	}
-	
-	lowThreshold = 10;
-	highThreashold = 50;//get high threshold
+	//初始化
+	lowThreshold = 40;
+	highThreashold = 80;//get high threshold
 	minScore = 0.7;
-	greediness = 0.5;
+	greediness = 0.8;
 	
-	CvSize templateSize = cvSize( templateImage->width, templateImage->height );
-	IplImage* grayTemplateImg = cvCreateImage( templateSize, IPL_DEPTH_8U, 1 );
-
+	cv::Mat grayTemplateImg = cv::Mat(templateImage.size(), CV_8UC1);
 	// Convert color image to gray image.
-	if(templateImage->nChannels == 3)
+	if(templateImage.channels() == 3)
 	{
-		cvCvtColor(templateImage, grayTemplateImg, CV_RGB2GRAY);
+		cv::cvtColor(templateImage, grayTemplateImg, cv::COLOR_RGB2GRAY);
 	}
 	else
 	{
-		cvCopy(templateImage, grayTemplateImg);
+		grayTemplateImg = templateImage.clone();
 	}
 	cout<< "\n Edge Based Template Matching Program\n";
 	cout<< " ------------------------------------\n";
 	
+	double time = cv::getTickCount();
 	if(!GM.CreateGeoMatchModel(grayTemplateImg,lowThreshold,highThreashold))
 	{
 		cout<<"ERROR: could not create model...";
 		return 0;
 	}
-	GM.DrawContours(templateImage,CV_RGB( 255, 0, 0 ),1);
+	GM.DrawContours(templateImage, 0);
 	cout<<" Shape model created.."<<"with  Low Threshold = "<<lowThreshold<<" High Threshold = "<<highThreashold<<endl;
-	CvSize searchSize = cvSize( searchImage->width, searchImage->height );
-	IplImage* graySearchImg = cvCreateImage( searchSize, IPL_DEPTH_8U, 1 );
+	cv::Size searchSize = cv::Size( searchImage.cols, searchImage.rows );
+	cv::Mat graySearchImg = cv::Mat(searchSize, CV_8UC1);
 
 	// Convert color image to gray image. 
-	if(searchImage->nChannels ==3)
-		cvCvtColor(searchImage, graySearchImg, CV_RGB2GRAY);
+	if (searchImage.channels() == 3)
+	{
+		cv::cvtColor(searchImage, graySearchImg, cv::COLOR_RGB2GRAY);
+	}
 	else
 	{
-		cvCopy(searchImage, graySearchImg);
+		graySearchImg = searchImage.clone();
 	}
 	cout<<" Finding Shape Model.."<<" Minumum Score = "<< minScore <<" Greediness = "<<greediness<<"\n\n";
 	cout<< " ------------------------------------\n";
 	clock_t start_time1 = clock();
-	score = GM.FindGeoMatchModel(graySearchImg,minScore,greediness,&result);
-	clock_t finish_time1 = clock();
-	total_time = (double)(finish_time1-start_time1)/CLOCKS_PER_SEC;
+	//score = GM.FindGeoMatchModel(graySearchImg,minScore,greediness,&result);
+	cv::Mat dst = cv::Mat::zeros(graySearchImg.size(), CV_32FC1);
+	GM.FindGeoMatchModel(graySearchImg, dst, minScore, greediness);
 
-	if(score>minScore) // if score is atleast 0.4
+	cv::Mat binary = dst > 0.6;
+	int an = 5;
+	cv::Mat element = getStructuringElement(cv::MORPH_RECT, cv::Size(an * 2 + 1, an * 2 + 1), cv::Point(an, an));
+	cv::morphologyEx(binary, binary, cv::MORPH_CLOSE, element);
+	std::vector<std::vector<cv::Point> > contours;
+	cv::findContours(binary, contours, cv::RETR_CCOMP, cv::CHAIN_APPROX_NONE);
+	if (contours.size() <= 0)
 	{
-		cout<<" Found at ["<<result.x<<", "<<result.y<<"]\n Score = "<<score<<"\n Searching Time = "<<total_time*1000<<"ms";
-		GM.DrawContours(searchImage,result,CV_RGB( 0, 255, 0 ),1);
+		return 0;
 	}
-	else
-		cout<<" Object Not found";
+	
+	cv::Rect tempRect;
+	double minVal, maxVal; 
+	cv::Point minLoc, maxLoc, matchLoc;
+	
+	cv::Mat tt = cv::Mat(graySearchImg.size(), CV_8UC1);
+	tt = graySearchImg.clone();
+	for (int i = 0; i < contours.size(); i++)
+	{
+		tempRect = cv::boundingRect(cv::Mat(contours[i]));
+		cv::minMaxLoc(dst(tempRect), &minVal, &maxVal, &minLoc, &maxLoc, cv::Mat());
+		maxLoc += cv::Point(tempRect.x, tempRect.y);
+		//cv::circle(tt, maxLoc, 3, cv::Scalar(255));
+		GM.DrawContours(tt, maxLoc, 0);
+	}
 
-	cout<< "\n ------------------------------------\n\n";
-	cout<<"\n Press any key to exit!";
-
-	//Display result
-	cvNamedWindow("Template",CV_WINDOW_AUTOSIZE );
-	cvShowImage("Template",templateImage);
-	cvNamedWindow("Search Image",CV_WINDOW_AUTOSIZE );
-	cvShowImage("Search Image",searchImage);
-	// wait for both windows to be closed before releasing images
-	cvWaitKey( 0 );
-	cvDestroyWindow("Search Image");
-	cvDestroyWindow("Template");
-	cvReleaseImage(&searchImage);
-	cvReleaseImage(&graySearchImg);
-	cvReleaseImage(&templateImage);
-	cvReleaseImage(&grayTemplateImg);
-
+	time = (cv::getTickCount() - time) * 1000.0 / cv::getTickFrequency();
+	printf("检测耗费时间为:%f毫秒", time);
 	return 1;
 }
 
